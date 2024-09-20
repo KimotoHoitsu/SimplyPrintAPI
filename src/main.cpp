@@ -6,6 +6,8 @@
 #include "esp_wpa2.h" // pour les réseaux wifi sécurisés
 #include "arduino_secrets.h" // fichier contenant les informations de connexion
 
+#include <HTTPClient.h>
+
 WiFiClient netSocket;
 
 void setup() {
@@ -28,9 +30,32 @@ void setup() {
   Serial.println(WiFi.SSID());
 }
 void loop() {
-  // Afficher la force du signal wifi toutes les 2 secondes
-  Serial.print("Signal Wifi: ");
-  Serial.print(WiFi.RSSI());
-  Serial.println(" dBm");
-  delay(2000);
+  if(WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+
+    // Spécification de l'URL
+    http.begin("https://api.simplyprint.io/12305/printers/Get");
+
+    // Ajout des headers
+    http.addHeader("accept", "application/json");
+    http.addHeader("X-API-KEY", API_KEY);
+
+    // Envoyer la requête POST
+    int httpResponseCode = http.POST("{}");
+
+    // Vérifier la réponse
+    if(httpResponseCode > 0) {
+      String response = http.getString();
+      Serial.println("Réponse du serveur: " + response);
+    } else {
+      Serial.println("Erreur lors de la requête POST: " + String(httpResponseCode));
+    }
+
+    // Terminer la connexion
+    http.end();
+  } else {
+    Serial.println("Non connecté au WiFi");
+  }
+
+  while(1);
 }
