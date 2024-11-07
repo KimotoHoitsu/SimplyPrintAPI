@@ -5,16 +5,22 @@
 #include <WiFi.h>
 #include "esp_wpa2.h"        // pour les réseaux wifi sécurisés
 #include "arduino_secrets.h" // fichier contenant les informations de connexion
-
+#include <ESP32Servo.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 
-WiFiClient netSocket;
 
+WiFiClient netSocket;
+bool btn;
+bool flag = 0;
+// simply print API URL: https://api.simplyprint.io/
+// my API KEY : 6beb928d-2dbc-4cff-80ec-e85a26a72377
+ESP32PWM pwm;
 void setup()
 {
   if (!Serial)
     delay(3000);
+  ESP32PWM::allocateTimer(0);
   Serial.begin(9600);
   // Connexion au réseau wifi sécurisé avec identifiant et mot de passe
   WiFi.begin(SECRET_SSID, WPA2_AUTH_PEAP, EAP_IDENTITY, EAP_USERNAME, EAP_PASSWORD);
@@ -26,7 +32,13 @@ void setup()
     Serial.println(SECRET_SSID); // print the network name (SSID)
     delay(2000);
   }
+  // config LED en sortie
+  pinMode(13, OUTPUT); // LED
+  pinMode(27, INPUT);
+  pwm.attachPin(12, 50, 10); //PIN, Freq, 10 bits resolution
 
+  //
+  
   // Afficher les informations de connexion
   Serial.print("Adresse IP : ");
   Serial.println(WiFi.localIP());
@@ -65,17 +77,59 @@ void loop()
       if (doc["status"] == true)
       {
         JsonArray data = doc["data"];
-
+        
         // Parcourir les objets dans "data"
         for (JsonObject printerObj : data)
         {
-          const char *printerName = printerObj["printer"]["name"];
-          const char *printerState = printerObj["printer"]["state"];
-          Serial.print("Nom de l'imprimante : ");
-          Serial.print(printerName);
-          Serial.print(" [");
-          Serial.print(printerState);
-          Serial.println("]");
+
+          int id = printerObj["id"];
+          //if (id == PRINTER_ID)
+          //{
+
+            const char *printerName = printerObj["printer"]["name"];
+            const char *printerState = printerObj["printer"]["state"];
+
+            Serial.print("Nom de l'imprimante : ");
+            Serial.print(printerName);
+            Serial.print(" [");
+            Serial.print(printerState);
+            Serial.println("]");
+            Serial.print("{");
+            Serial.print(id);
+            Serial.println("}");
+               
+            if (strcmp(printerState, "printing") == 0 && id == 21937)//si l'imprimante 402 est en train d'imprimer
+            {
+            
+              Serial.println("Allume");
+              if (flag == 0){
+              btn = digitalRead(27);
+              }
+              Serial.println(btn);
+              digitalWrite(13, btn); // Turn LED ON
+
+                if (!btn)
+                {
+                  pwm.writeScaled(0.05);//1ms verrouiller
+
+                } 
+                else 
+                {
+                  pwm.writeScaled(0.1);//2ms deverouiller
+                  btn = 1;
+                  flag = 1;
+                }
+            }
+            else
+            {
+              Serial.println("Éteind");
+             // digitalWrite(13, LOW); // Turn LED OFF
+            }
+
+    
+
+            
+          //}
         }
       }
       else
@@ -91,6 +145,5 @@ void loop()
       Serial.println("Non connecté au WiFi");
     }
 
-    while (1);
   }
 }
